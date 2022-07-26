@@ -1,0 +1,55 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ '**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: ${{ matrix.spec.name }}
+    runs-on: ${{ matrix.spec.runner }}
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+    strategy:
+      fail-fast: false
+      matrix:
+        spec:
+        - { name: 'Linux x86_64', runner: 'ubuntu-18.04' }
+
+    steps:
+      - name: Install Crossbuild tools
+        if: matrix.spec.runner == 'ubuntu-18.04'
+        run: |
+          sudo apt update -y
+          sudo apt install -y crossbuild-essential-armhf crossbuild-essential-arm64
+
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - run: |
+          echo "BUILD_NUMBER = ${BUILD_NUMBER}"
+          cmake -E make_directory ${{ runner.workspace }}/build
+
+      - name: setup/build CMake
+        env:
+          TOOLCHAIN: ${{ matrix.spec.toolchain && format('{0}/toolchains/{1}.cmake', github.workspace, matrix.spec.toolchain) || '' }}
+        run: |
+          echo   cmake -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN}" -S ${{ github.workspace }} -B ${{runner.workspace}}/build
+          cmake -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN}" -S ${{ github.workspace }} -B ${{runner.workspace}}/build
+          cmake --build ${{runner.workspace}}/build
+
+      - name: test
+        if: matrix.spec.no_tests != 'true'
+        working-directory: ${{runner.workspace}}/build
+        run: ctest -VV --no-compress-output
+
+      - name: make artifacts
+        run: cmake --build ${{runner.workspace}}/build --target zitify-pack
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: zitify-pack-${{ matrix.spec.toolchain || runner.os }}
+          path: ${{ runner.workspace }}/build/package/ziti-sdk-*
