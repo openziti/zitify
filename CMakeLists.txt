@@ -1,3 +1,30 @@
+cmake_minimum_required(VERSION 3.14)
+include(git.cmake)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_CXX_STANDARD 11)
+
+if (NOT ver)
+    set(ver 0.1.0)
+endif()
+
+project(zitify
+        VERSION ${ver}
+        LANGUAGES C CXX
+        )
+
+include(deps.cmake)
+
+find_program(ZIP NAMES 7z)
+if (ZIP)
+    set(ZIP_OPTS a -tzip)
+else ()
+    find_program(ZIP NAMES zip)
+    if (ZIP)
+        set(ZIP_OPTS "-jv")
+    else ()
+        message("zip program not found")
+    endif ()
+endif ()
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
@@ -6,7 +33,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
     target_link_libraries(zitify PRIVATE ziti)
 
-    set(zitify_archive zitify-${PROJECT_VERSION}-${CPACK_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}.zip)
+    set(zitify_archive zitify-${CMAKE_PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}.zip)
 
     add_custom_target(zitify-pack
             BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${zitify_archive}
