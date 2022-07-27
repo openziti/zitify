@@ -15,12 +15,13 @@ class MyTestCase(unittest.TestCase):
         import json
         result = subprocess.run(
             args=['curl', 'http://httpbin.ziti/json'],
-            capture_output=True,
             env={
                 'LD_PRELOAD': zitify_lib,
                 'ZITI_IDENTITIES': os.getenv('ZITI_TEST_IDENTITY'),
                 'ZITI_LOG': '2'
-            }
+            },
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
         )
 
         self.assertEqual(result.returncode, 0, f'should succeed: ${result.stderr.decode()}')
