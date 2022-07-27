@@ -14,6 +14,9 @@ project(zitify
 
 include(deps.cmake)
 
+include(CTest)
+enable_testing()
+
 find_program(ZIP NAMES 7z)
 if (ZIP)
     set(ZIP_OPTS a -tzip)
@@ -41,6 +44,8 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
             DEPENDS zitify
             COMMAND ${ZIP} ${ZIP_OPTS} ${zitify_archive} $<TARGET_FILE:zitify> ${CMAKE_CURRENT_SOURCE_DIR}/zitify
             )
+
+    add_subdirectory(tests)
 else()
     add_custom_target(zitify-pack
             COMMAND echo "zitify not yet implemented on ${CMAKE_SYSTEM_NAME} platform"
