@@ -45,7 +45,7 @@ jobs:
         working-directory: ${{runner.workspace}}/build
         shell: bash
         env:
-          ZITI_TEST_IDENTITY: id.json
+          ZITI_TEST_IDENTITY: ${{ runner.workspace }}/id.json
           ZITI_TEST_ID: ${{ secrets.ZITI_TEST_IDENTITY }}
         run: |
           echo "$ZITI_TEST_ID" > $ZITI_TEST_IDENTITY
