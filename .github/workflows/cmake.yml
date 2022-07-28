@@ -58,4 +58,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: zitify-pack-${{ matrix.spec.toolchain || runner.os }}
-          path: ${{ runner.workspace }}/build/package/ziti-sdk-*
+          path: ${{ runner.workspace }}/build/zitify-*.zip
