@@ -1,17 +1,17 @@
 cmake_minimum_required(VERSION 3.14)
-include(git.cmake)
+include(cmake/version.cmake)
+
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 11)
 
-if (NOT ver)
-    set(ver 0.1.0)
-endif()
+get_version(${CMAKE_CURRENT_LIST_DIR}/version.txt zitify_version)
 
 project(zitify
-        VERSION ${ver}
+        VERSION ${zitify_version}
         LANGUAGES C CXX
         )
 
+message("zitify version: ${PROJECT_VERSION}")
 include(deps.cmake)
 
 include(CTest)
@@ -31,8 +31,10 @@ endif ()
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
-    add_library(zitify SHARED
-            zitify.cpp)
+    add_library(zitify SHARED zitify.cpp)
+    set_target_properties(zitify PROPERTIES
+                      VERSION ${PROJECT_VERSION}
+                      SOVERSION ${PROJECT_VERSION_MAJOR})
 
     target_link_libraries(zitify PRIVATE ziti)
 
