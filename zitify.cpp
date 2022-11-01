@@ -33,6 +33,9 @@ typedef int (*fork_f_t)();
 typedef int (*socket_f_t)(int, int, int);
 typedef int (*connect_f_t)(int, const struct sockaddr *, socklen_t);
 typedef int (*bind_f_t)(int, const struct sockaddr *, socklen_t);
+typedef int (*setsockopt_f_t)(int fd, int level, int optname,
+		       const void *optval, socklen_t optlen);
+
 
 typedef int (*getnameinfo_f_t)(const struct sockaddr *sa, socklen_t salen,
                 char *host, size_t hostlen,
@@ -59,6 +62,7 @@ XX(getnameinfo)       \
 XX(getaddrinfo)       \
 XX(gethostbyaddr)     \
 XX(gethostbyaddr_r)   \
+XX(setsockopt)        \
 XX(close)
 
 static struct {
@@ -184,6 +188,7 @@ int getnameinfo(const struct sockaddr *addr, socklen_t salen,
 
     snprintf(host, hostlen, "%s", hostname);
     snprintf(serv, servlen, "%d", ntohs(port));
+    return 0;
 }
 
 int connect(int fd, const struct sockaddr *addr, socklen_t size) {
@@ -222,6 +227,14 @@ int connect(int fd, const struct sockaddr *addr, socklen_t size) {
     LOG("connected fd=%d rc=%d", fd, rc);
 
     return rc;
+}
+
+int setsockopt(int fd, int level, int optname,
+		       const void *optval, socklen_t optlen) {
+    if (Ziti_check_socket(fd) == 0) {
+        return stdlib.setsockopt_f(fd, level, optname, optval, optlen);
+    }
+    return 0;
 }
 
 //int listen(int fd, int backlog) {
