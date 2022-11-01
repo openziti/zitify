@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         spec:
-        - { name: 'Linux x86_64', runner: 'ubuntu-18.04' }
+        - { name: 'Linux x86_64', runner: 'ubuntu-20.04' }
 
     steps:
       - uses: actions/checkout@v3
@@ -25,7 +25,6 @@ jobs:
         env:
           TOOLCHAIN: ${{ matrix.spec.toolchain && format('{0}/toolchains/{1}.cmake', github.workspace, matrix.spec.toolchain) || '' }}
         run: |
-          echo "build number = ${BUILD_NUMBER}"
           cmake -E make_directory ${{runner.workspace}}/build
           cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN}" -S ${{ github.workspace }} -B ${{runner.workspace}}/build
           cmake --build ${{runner.workspace}}/build --config Release
