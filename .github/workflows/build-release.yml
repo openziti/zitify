@@ -1,0 +1,41 @@
+name: Publish Release
+
+on:
+  release:
+    types: [ published ]
+
+jobs:
+  build:
+    name: ${{ matrix.spec.name }}
+    runs-on: ${{ matrix.spec.runner }}
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+    strategy:
+      fail-fast: false
+      matrix:
+        spec:
+        - { name: 'Linux x86_64', runner: 'ubuntu-18.04' }
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: setup/build CMake
+        env:
+          TOOLCHAIN: ${{ matrix.spec.toolchain && format('{0}/toolchains/{1}.cmake', github.workspace, matrix.spec.toolchain) || '' }}
+        run: |
+          echo "build number = ${BUILD_NUMBER}"
+          cmake -E make_directory ${{runner.workspace}}/build
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN}" -S ${{ github.workspace }} -B ${{runner.workspace}}/build
+          cmake --build ${{runner.workspace}}/build --config Release
+
+      - name: make artifacts
+        run: cmake --build ${{runner.workspace}}/build --config Release --target zitify-pack
+
+      - name: upload SDK release bundle
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            ${{runner.workspace}}/build/zitify-*.zip
