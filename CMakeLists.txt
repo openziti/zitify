@@ -34,9 +34,9 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
             BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${zitify_archive}
             ALL
             DEPENDS zitify
-            COMMAND echo TARGET_FILE=$<TARGET_FILE:zitify>
-            COMMAND echo TARGET_LINKER_FILE_NAME=$<TARGET_LINKER_FILE_NAME:zitify>
-            COMMAND ${CMAKE_COMMAND} -E tar czvf ${zitify_archive} ${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_LINKER_FILE_NAME:zitify>* ${CMAKE_CURRENT_BINARY_DIR}/zitify
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/package
+            COMMAND ${CMAKE_COMMAND} -E tar czvf ${CMAKE_CURRENT_BINARY_DIR}/package/${zitify_archive}
+                      ${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_LINKER_FILE_NAME:zitify>* ${CMAKE_CURRENT_BINARY_DIR}/zitify
             )
 
     add_subdirectory(tests)
