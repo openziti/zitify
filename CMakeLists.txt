@@ -17,18 +17,6 @@ include(deps.cmake)
 include(CTest)
 enable_testing()
 
-find_program(ZIP NAMES 7z)
-if (ZIP)
-    set(ZIP_OPTS a -tzip)
-else ()
-    find_program(ZIP NAMES zip)
-    if (ZIP)
-        set(ZIP_OPTS "-jv")
-    else ()
-        message("zip program not found")
-    endif ()
-endif ()
-
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
     add_library(zitify SHARED zitify.cpp)
@@ -38,13 +26,17 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
     target_link_libraries(zitify PRIVATE ziti)
 
-    set(zitify_archive zitify-${CMAKE_PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}.zip)
+    set(zitify_archive zitify-${CMAKE_PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}.tar.gz)
+
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/zitify DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
     add_custom_target(zitify-pack
             BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${zitify_archive}
             ALL
             DEPENDS zitify
-            COMMAND ${ZIP} ${ZIP_OPTS} ${zitify_archive} $<TARGET_FILE:zitify> ${CMAKE_CURRENT_SOURCE_DIR}/zitify
+            COMMAND echo TARGET_FILE=$<TARGET_FILE:zitify>
+            COMMAND echo TARGET_LINKER_FILE_NAME=$<TARGET_LINKER_FILE_NAME:zitify>
+            COMMAND ${CMAKE_COMMAND} -E tar czvf ${zitify_archive} ${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_LINKER_FILE_NAME:zitify>* ${CMAKE_CURRENT_BINARY_DIR}/zitify
             )
 
     add_subdirectory(tests)
