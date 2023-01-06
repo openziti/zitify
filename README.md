@@ -26,6 +26,6 @@ zitify curl http://httpbin.ziti/json
 
 ## How it Works
 
-`zitify` is a shell script that employs the `LD_PRELOAD` trick (refer to `man 8 ld.so`) to override a handful of networking-related functions from the GNU C standard library (`glibc`), e.g.,  `getaddrinfo()`, `getnameinfo()`, and `connect()` for dynamic executables.
+`zitify` is a shell script that employs the `LD_PRELOAD` trick (refer to [`man 8 ld.so`](https://man7.org/linux/man-pages/man8/ld.so.8.html)) to override a handful of networking-related functions from the GNU C standard library (`glibc`), e.g.,  `getaddrinfo()`, `getnameinfo()`, and `connect()` for dynamic executables.
 
-Statically-linked binaries, like Go programs, will not pre-load `libzitify.so`.
+Statically-linked binaries, like Go programs, and programs that do not link to `libc.so` (check links with command `ldd EXECUTABLE`), will not work with this tool.
