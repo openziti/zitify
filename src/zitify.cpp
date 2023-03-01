@@ -14,7 +14,6 @@
 
 #define  _GNU_SOURCE
 
-#include <dlfcn.h>
 #include <sys/socket.h>
 #include <uv.h>
 #include <string>
@@ -22,53 +21,17 @@
 #include <ziti/zitilib.h>
 #include <ziti/model_collections.h>
 
+#include "std_funcs.h"
+
 #if defined(DEBUG_zitify)
 #define LOG(f, ...) fprintf(stderr, "[%d] %s: " f "\n", getpid(), __FUNCTION__, ##__VA_ARGS__)
 #else
 #define LOG(f,...)
 #endif
 
-typedef int (*syscall_f_t)(long sysno, ...);
-typedef int (*fork_f_t)();
-typedef int (*socket_f_t)(int, int, int);
-typedef int (*connect_f_t)(int, const struct sockaddr *, socklen_t);
-typedef int (*bind_f_t)(int, const struct sockaddr *, socklen_t);
-typedef int (*setsockopt_f_t)(int fd, int level, int optname,
-		       const void *optval, socklen_t optlen);
+static const struct stdlib_funcs_s& stdlib = *stdlib_funcs();
 
-
-typedef int (*getnameinfo_f_t)(const struct sockaddr *sa, socklen_t salen,
-                char *host, size_t hostlen,
-                char *serv, size_t servlen, int flags);
-
-typedef int (*gethostbyaddr_r_f_t)(const void *addr, socklen_t len, int type, struct hostent *ret, char *buf, size_t buflen,
-        struct hostent **result, int *h_errnop);
-
-typedef struct hostent * (*gethostbyaddr_f_t)(const void *addr, socklen_t len, int type);
-
-typedef int (*getaddrinfo_f_t)(const char * name, const char * service, const struct addrinfo * req, struct addrinfo ** pai);
-typedef int (*getsockopt_f_t)(int fd, int level, int optname, void * optval, socklen_t * optlen);
-typedef int (*close_f_t)(int fd);
-
-static uv_once_t zitiy_init;
 static uv_once_t load_once;
-
-#define LIB_FUNCS(XX) \
-XX(socket)            \
-XX(connect)           \
-XX(bind)              \
-XX(fork)              \
-XX(getnameinfo)       \
-XX(getaddrinfo)       \
-XX(gethostbyaddr)     \
-XX(gethostbyaddr_r)   \
-XX(setsockopt)        \
-XX(close)
-
-static struct {
-#define decl_stdlib_f(f) f##_f_t f##_f;
-    LIB_FUNCS(decl_stdlib_f)
-} stdlib;
 
 static void load_identities() {
     Ziti_lib_init();
@@ -90,13 +53,8 @@ static void lazy_load() {
     uv_once(&load_once, load_identities);
 }
 
-static void do_init() {
-#define LOAD_FUNCS(f) stdlib.f##_f = (f##_f_t)dlsym(RTLD_NEXT, #f);
-    LIB_FUNCS(LOAD_FUNCS)
-}
 
 static void zitify() {
-    uv_once(&zitiy_init, do_init);
     Ziti_lib_init();
 
 }

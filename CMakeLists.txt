@@ -19,7 +19,9 @@ enable_testing()
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
-    add_library(zitify SHARED zitify.cpp)
+    add_library(zitify SHARED
+            src/zitify.cpp src/std_funcs.h src/std_funcs.c)
+
     set_target_properties(zitify PROPERTIES
                       VERSION ${PROJECT_VERSION}
                       SOVERSION ${PROJECT_VERSION_MAJOR})
