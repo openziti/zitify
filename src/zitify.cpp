@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define  _GNU_SOURCE
-
 #include <sys/socket.h>
 #include <uv.h>
 #include <string>
@@ -22,6 +20,7 @@
 #include <ziti/model_collections.h>
 
 #include "std_funcs.h"
+#include "zitify.h"
 
 #if defined(DEBUG_zitify)
 #define LOG(f, ...) fprintf(stderr, "[%d] %s: " f "\n", getpid(), __FUNCTION__, ##__VA_ARGS__)
@@ -32,7 +31,7 @@
 static const struct stdlib_funcs_s& stdlib = *stdlib_funcs();
 
 static uv_once_t load_once;
-
+static ziti_context ziti_instance;
 static void load_identities() {
     Ziti_lib_init();
 
@@ -41,12 +40,10 @@ static void load_identities() {
 
     std::string ids(env_str);
     size_t pos;
-    do {
-        pos = ids.find(';');
-        auto id = ids.substr(0, pos);
-        Ziti_load_context(id.c_str());
-        ids.erase(0, pos + 1);
-    } while (pos != std::string::npos);
+    pos = ids.find(';');
+    auto id = ids.substr(0, pos);
+    ziti_instance = Ziti_load_context(id.c_str());
+    ids.erase(0, pos + 1);
 }
 
 static void lazy_load() {
@@ -69,11 +66,16 @@ class Zitifier {
 public:
     Zitifier() {
         zitify();
+        configure_bindings();
         lazy_load();
     }
 };
 
 static Zitifier loader;
+
+ziti_context get_ziti_context() {
+    return ziti_instance;
+}
 
 int gethostbyaddr_r(const void *addr, socklen_t len, int type,
         struct hostent *ret, char *buf, size_t buflen,
@@ -194,40 +196,3 @@ int setsockopt(int fd, int level, int optname,
     }
     return 0;
 }
-
-//int listen(int fd, int backlog) {
-//    return Ziti_listen(fd, backlog);
-//}
-//
-//int accept(int fd, struct sockaddr *addr, socklen_t *socklen) {
-//    ziti_socket_t clt = Ziti_accept(fd, NULL, 0);
-//    if (socklen)
-//        *socklen = 0;
-//    fprintf(stderr,"accepted client=%d\n", clt);
-//    return clt;
-//}
-
-//int bind(int fd, const struct sockaddr *addr, socklen_t len) {
-//    std::cerr << "in my bind(" << fd << ")" << std::endl;
-//    int type = 0;
-//    socklen_t l = sizeof(type);
-//    ziti_context ztx = Ziti_load_context("/home/eugene/work/zeds/ek-zeds-host.json");
-//    auto service ="super-service ek-test Z29vZ2xlLW9hdXRoMnwxMTM2MjIxOTc4NjgzNDE3NzY1MDg=";
-//    int rc = Ziti_bind(fd, ztx, service, nullptr);
-//    if (rc != 0) {
-//        fprintf(stderr,"bind error(): %d/%s\n", Ziti_last_error(), ziti_errorstr(Ziti_last_error()));
-//        if (Ziti_last_error() == EALREADY) {
-//            return 0;
-//        }
-//    }
-//    // int rc = getsockopt_f(fd, SOL_SOCKET, SO_DOMAIN, &type, &l);
-////    fprintf(stderr,"\nfd = %d, type = %d, rc = %d\n", fd, type, rc);
-////
-////    if (type == AF_INET)
-////        rc = bind_f(fd, addr, len);
-////    else
-////        rc = 0;
-//    fprintf(stderr,"\nbind(): fd = %d, rc = %d\n", fd, rc);
-//
-//    return rc;
-//}

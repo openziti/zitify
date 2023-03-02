@@ -41,12 +41,17 @@ typedef int (*getaddrinfo_f_t)(const char *name, const char *service, const stru
 typedef int (*getsockopt_f_t)(int fd, int level, int optname, void *optval, socklen_t *optlen);
 typedef int (*close_f_t)(int fd);
 
+typedef int (*accept_f_t)(int, const struct sockaddr*, socklen_t *);
+typedef int (*accept4_f_t)(int, const struct sockaddr*, socklen_t *, int);
+
 
 #define LIB_FUNCS(XX)   \
     XX(socket)          \
     XX(connect)         \
     XX(listen)          \
     XX(bind)            \
+    XX(accept)          \
+    XX(accept4)         \
     XX(fork)            \
     XX(getnameinfo)     \
     XX(getaddrinfo)     \
@@ -60,6 +65,14 @@ struct stdlib_funcs_s {
     LIB_FUNCS(decl_stdlib_f)
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern const struct stdlib_funcs_s *stdlib_funcs();
+
+#ifdef __cplusplus
+};
+#endif
 
 #endif//ZITIFY_STD_FUNCS_H
