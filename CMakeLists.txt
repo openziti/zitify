@@ -31,12 +31,13 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
     set(zitify_archive zitify-${CMAKE_PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}.tar.gz)
 
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/zitify DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/zitify ${CMAKE_CURRENT_BINARY_DIR} @ONLY)
 
     add_custom_target(zitify-pack
             BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${zitify_archive}
             ALL
             DEPENDS zitify
+            DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/zitify
             COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/package
             COMMAND ${CMAKE_COMMAND} -E tar czvf ${CMAKE_CURRENT_BINARY_DIR}/package/${zitify_archive}
                       ${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_LINKER_FILE_NAME:zitify>* ${CMAKE_CURRENT_BINARY_DIR}/zitify
