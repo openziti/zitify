@@ -12,64 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define  _GNU_SOURCE
-
-#include <dlfcn.h>
 #include <sys/socket.h>
 #include <uv.h>
 #include <string>
 
 #include <ziti/zitilib.h>
+#include <ziti/ziti_log.h>
 #include <ziti/model_collections.h>
 
-#if defined(DEBUG_zitify)
-#define LOG(f, ...) fprintf(stderr, "[%d] %s: " f "\n", getpid(), __FUNCTION__, ##__VA_ARGS__)
-#else
-#define LOG(f,...)
-#endif
-
-typedef int (*syscall_f_t)(long sysno, ...);
-typedef int (*fork_f_t)();
-typedef int (*socket_f_t)(int, int, int);
-typedef int (*connect_f_t)(int, const struct sockaddr *, socklen_t);
-typedef int (*bind_f_t)(int, const struct sockaddr *, socklen_t);
-typedef int (*setsockopt_f_t)(int fd, int level, int optname,
-		       const void *optval, socklen_t optlen);
+#include "std_funcs.h"
+#include "zitify.h"
 
 
-typedef int (*getnameinfo_f_t)(const struct sockaddr *sa, socklen_t salen,
-                char *host, size_t hostlen,
-                char *serv, size_t servlen, int flags);
+static const struct stdlib_funcs_s& stdlib = *stdlib_funcs();
 
-typedef int (*gethostbyaddr_r_f_t)(const void *addr, socklen_t len, int type, struct hostent *ret, char *buf, size_t buflen,
-        struct hostent **result, int *h_errnop);
-
-typedef struct hostent * (*gethostbyaddr_f_t)(const void *addr, socklen_t len, int type);
-
-typedef int (*getaddrinfo_f_t)(const char * name, const char * service, const struct addrinfo * req, struct addrinfo ** pai);
-typedef int (*getsockopt_f_t)(int fd, int level, int optname, void * optval, socklen_t * optlen);
-typedef int (*close_f_t)(int fd);
-
-static uv_once_t zitiy_init;
 static uv_once_t load_once;
-
-#define LIB_FUNCS(XX) \
-XX(socket)            \
-XX(connect)           \
-XX(bind)              \
-XX(fork)              \
-XX(getnameinfo)       \
-XX(getaddrinfo)       \
-XX(gethostbyaddr)     \
-XX(gethostbyaddr_r)   \
-XX(setsockopt)        \
-XX(close)
-
-static struct {
-#define decl_stdlib_f(f) f##_f_t f##_f;
-    LIB_FUNCS(decl_stdlib_f)
-} stdlib;
-
+static ziti_context ziti_instance;
 static void load_identities() {
     Ziti_lib_init();
 
@@ -78,25 +36,18 @@ static void load_identities() {
 
     std::string ids(env_str);
     size_t pos;
-    do {
-        pos = ids.find(';');
-        auto id = ids.substr(0, pos);
-        Ziti_load_context(id.c_str());
-        ids.erase(0, pos + 1);
-    } while (pos != std::string::npos);
+    pos = ids.find(';');
+    auto id = ids.substr(0, pos);
+    ziti_instance = Ziti_load_context(id.c_str());
+    ids.erase(0, pos + 1);
 }
 
 static void lazy_load() {
     uv_once(&load_once, load_identities);
 }
 
-static void do_init() {
-#define LOAD_FUNCS(f) stdlib.f##_f = (f##_f_t)dlsym(RTLD_NEXT, #f);
-    LIB_FUNCS(LOAD_FUNCS)
-}
 
 static void zitify() {
-    uv_once(&zitiy_init, do_init);
     Ziti_lib_init();
 
 }
@@ -111,18 +62,23 @@ class Zitifier {
 public:
     Zitifier() {
         zitify();
+        configure_bindings();
         lazy_load();
     }
 };
 
 static Zitifier loader;
 
+ziti_context get_ziti_context() {
+    return ziti_instance;
+}
+
 int gethostbyaddr_r(const void *addr, socklen_t len, int type,
         struct hostent *ret, char *buf, size_t buflen,
         struct hostent **result, int *h_errnop) {
     char b[UV_MAXHOSTNAMESIZE];
     uv_inet_ntop(type, addr, b, sizeof(b));
-    LOG("len=%d type=%d: %s ", len, type, b);
+    ZITI_LOG(DEBUG,"len=%d type=%d: %s ", len, type, b);
 
 //    in_port_t port = 0;
 //    in_addr_t in_addr = 0;
@@ -145,7 +101,7 @@ int gethostbyaddr_r(const void *addr, socklen_t len, int type,
 
 struct hostent *gethostbyaddr(const void *addr,
                               socklen_t len, int type) {
-    LOG("gethostbyaddr()");
+    ZITI_LOG(DEBUG,"gethostbyaddr()");
     return stdlib.gethostbyaddr_f(addr, len, type);
 }
 
@@ -153,7 +109,7 @@ int getaddrinfo(const char *__restrict name,
                 const char *__restrict service,
                 const struct addrinfo *__restrict hints,
                 struct addrinfo **__restrict pai) {
-    LOG("resolving %s:%s", name, service);
+    ZITI_LOG(DEBUG,"resolving %s:%s", name, service);
     int rc = Ziti_resolve(name, service, hints, pai);
     if (rc != 0) {
         rc = stdlib.getaddrinfo_f(name, service, hints, pai);
@@ -165,7 +121,7 @@ int getaddrinfo(const char *__restrict name,
 int getnameinfo(const struct sockaddr *addr, socklen_t salen,
                 char *host, size_t hostlen,
                 char *serv, size_t servlen, int flags) {
-    LOG("in getnameinfo");
+    ZITI_LOG(DEBUG,"in getnameinfo");
     in_port_t port = 0;
     in_addr_t in_addr = 0;
     if (addr->sa_family == AF_INET) {
@@ -182,7 +138,7 @@ int getnameinfo(const struct sockaddr *addr, socklen_t salen,
 
     const char* hostname;
     if (in_addr == 0 || (hostname = Ziti_lookup(in_addr)) == nullptr) {
-        LOG("fallback getnameinfo", hostname);
+        ZITI_LOG(DEBUG,"fallback getnameinfo", hostname);
         return stdlib.getnameinfo_f(addr, salen, host, hostlen, serv, servlen, flags);
     }
 
@@ -214,17 +170,17 @@ int connect(int fd, const struct sockaddr *addr, socklen_t size) {
 
     const char* hostname;
     if (in_addr == 0 || (hostname = Ziti_lookup(in_addr)) == nullptr) {
-        LOG("fallback connect: %s", addrbuf);
+        ZITI_LOG(DEBUG,"fallback connect: %s", addrbuf);
         return stdlib.connect_f(fd, addr, size);
     }
     port = ntohs(port);
 
-    LOG("connecting fd=%d addr=%s(%s):%d", fd, addrbuf, hostname, port);
+    ZITI_LOG(DEBUG,"connecting fd=%d addr=%s(%s):%d", fd, addrbuf, hostname, port);
 
     int flags = fcntl(fd, F_GETFL);
     int rc = Ziti_connect_addr(fd, hostname, (unsigned int)(port));
     fcntl(fd, F_SETFL, flags);
-    LOG("connected fd=%d rc=%d", fd, rc);
+    ZITI_LOG(DEBUG,"connected fd=%d rc=%d", fd, rc);
 
     return rc;
 }
@@ -236,40 +192,3 @@ int setsockopt(int fd, int level, int optname,
     }
     return 0;
 }
-
-//int listen(int fd, int backlog) {
-//    return Ziti_listen(fd, backlog);
-//}
-//
-//int accept(int fd, struct sockaddr *addr, socklen_t *socklen) {
-//    ziti_socket_t clt = Ziti_accept(fd, NULL, 0);
-//    if (socklen)
-//        *socklen = 0;
-//    fprintf(stderr,"accepted client=%d\n", clt);
-//    return clt;
-//}
-
-//int bind(int fd, const struct sockaddr *addr, socklen_t len) {
-//    std::cerr << "in my bind(" << fd << ")" << std::endl;
-//    int type = 0;
-//    socklen_t l = sizeof(type);
-//    ziti_context ztx = Ziti_load_context("/home/eugene/work/zeds/ek-zeds-host.json");
-//    auto service ="super-service ek-test Z29vZ2xlLW9hdXRoMnwxMTM2MjIxOTc4NjgzNDE3NzY1MDg=";
-//    int rc = Ziti_bind(fd, ztx, service, nullptr);
-//    if (rc != 0) {
-//        fprintf(stderr,"bind error(): %d/%s\n", Ziti_last_error(), ziti_errorstr(Ziti_last_error()));
-//        if (Ziti_last_error() == EALREADY) {
-//            return 0;
-//        }
-//    }
-//    // int rc = getsockopt_f(fd, SOL_SOCKET, SO_DOMAIN, &type, &l);
-////    fprintf(stderr,"\nfd = %d, type = %d, rc = %d\n", fd, type, rc);
-////
-////    if (type == AF_INET)
-////        rc = bind_f(fd, addr, len);
-////    else
-////        rc = 0;
-//    fprintf(stderr,"\nbind(): fd = %d, rc = %d\n", fd, rc);
-//
-//    return rc;
-//}

@@ -7,8 +7,6 @@ print(zitify_lib)
 @unittest.skipIf(os.getenv('ZITI_TEST_IDENTITY') is None, 'ZITI_TEST_IDENTITY is required')
 @unittest.skipIf(zitify_lib is None, 'libzitify.so is required')
 class MyTestCase(unittest.TestCase):
-    def test2(self):
-        pass
 
     def test_curl(self):
         import subprocess
@@ -28,6 +26,7 @@ class MyTestCase(unittest.TestCase):
         j = json.loads(result.stdout.decode())
         print(j)
         print(result.stderr.decode())
+
 
 if __name__ == '__main__':
     unittest.main()
