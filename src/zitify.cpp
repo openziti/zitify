@@ -17,16 +17,12 @@
 #include <string>
 
 #include <ziti/zitilib.h>
+#include <ziti/ziti_log.h>
 #include <ziti/model_collections.h>
 
 #include "std_funcs.h"
 #include "zitify.h"
 
-#if defined(DEBUG_zitify)
-#define LOG(f, ...) fprintf(stderr, "[%d] %s: " f "\n", getpid(), __FUNCTION__, ##__VA_ARGS__)
-#else
-#define LOG(f,...)
-#endif
 
 static const struct stdlib_funcs_s& stdlib = *stdlib_funcs();
 
@@ -82,7 +78,7 @@ int gethostbyaddr_r(const void *addr, socklen_t len, int type,
         struct hostent **result, int *h_errnop) {
     char b[UV_MAXHOSTNAMESIZE];
     uv_inet_ntop(type, addr, b, sizeof(b));
-    LOG("len=%d type=%d: %s ", len, type, b);
+    ZITI_LOG(DEBUG,"len=%d type=%d: %s ", len, type, b);
 
 //    in_port_t port = 0;
 //    in_addr_t in_addr = 0;
@@ -105,7 +101,7 @@ int gethostbyaddr_r(const void *addr, socklen_t len, int type,
 
 struct hostent *gethostbyaddr(const void *addr,
                               socklen_t len, int type) {
-    LOG("gethostbyaddr()");
+    ZITI_LOG(DEBUG,"gethostbyaddr()");
     return stdlib.gethostbyaddr_f(addr, len, type);
 }
 
@@ -113,7 +109,7 @@ int getaddrinfo(const char *__restrict name,
                 const char *__restrict service,
                 const struct addrinfo *__restrict hints,
                 struct addrinfo **__restrict pai) {
-    LOG("resolving %s:%s", name, service);
+    ZITI_LOG(DEBUG,"resolving %s:%s", name, service);
     int rc = Ziti_resolve(name, service, hints, pai);
     if (rc != 0) {
         rc = stdlib.getaddrinfo_f(name, service, hints, pai);
@@ -125,7 +121,7 @@ int getaddrinfo(const char *__restrict name,
 int getnameinfo(const struct sockaddr *addr, socklen_t salen,
                 char *host, size_t hostlen,
                 char *serv, size_t servlen, int flags) {
-    LOG("in getnameinfo");
+    ZITI_LOG(DEBUG,"in getnameinfo");
     in_port_t port = 0;
     in_addr_t in_addr = 0;
     if (addr->sa_family == AF_INET) {
@@ -142,7 +138,7 @@ int getnameinfo(const struct sockaddr *addr, socklen_t salen,
 
     const char* hostname;
     if (in_addr == 0 || (hostname = Ziti_lookup(in_addr)) == nullptr) {
-        LOG("fallback getnameinfo", hostname);
+        ZITI_LOG(DEBUG,"fallback getnameinfo", hostname);
         return stdlib.getnameinfo_f(addr, salen, host, hostlen, serv, servlen, flags);
     }
 
@@ -174,17 +170,17 @@ int connect(int fd, const struct sockaddr *addr, socklen_t size) {
 
     const char* hostname;
     if (in_addr == 0 || (hostname = Ziti_lookup(in_addr)) == nullptr) {
-        LOG("fallback connect: %s", addrbuf);
+        ZITI_LOG(DEBUG,"fallback connect: %s", addrbuf);
         return stdlib.connect_f(fd, addr, size);
     }
     port = ntohs(port);
 
-    LOG("connecting fd=%d addr=%s(%s):%d", fd, addrbuf, hostname, port);
+    ZITI_LOG(DEBUG,"connecting fd=%d addr=%s(%s):%d", fd, addrbuf, hostname, port);
 
     int flags = fcntl(fd, F_GETFL);
     int rc = Ziti_connect_addr(fd, hostname, (unsigned int)(port));
     fcntl(fd, F_SETFL, flags);
-    LOG("connected fd=%d rc=%d", fd, rc);
+    ZITI_LOG(DEBUG,"connected fd=%d rc=%d", fd, rc);
 
     return rc;
 }
