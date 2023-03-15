@@ -17,33 +17,9 @@
 #define ZITIFY_STD_FUNCS_H
 
 #include <sys/socket.h>
-
-typedef int (*syscall_f_t)(long sysno, ...);
-typedef int (*fork_f_t)();
-typedef int (*socket_f_t)(int, int, int);
-typedef int (*connect_f_t)(int, const struct sockaddr *, socklen_t);
-typedef int (*listen_f_t)(int, int);
-typedef int (*bind_f_t)(int, const struct sockaddr *, socklen_t);
-typedef int (*setsockopt_f_t)(int fd, int level, int optname,
-                              const void *optval, socklen_t optlen);
-
-
-typedef int (*getnameinfo_f_t)(const struct sockaddr *sa, socklen_t salen,
-                               char *host, size_t hostlen,
-                               char *serv, size_t servlen, int flags);
-
-typedef int (*gethostbyaddr_r_f_t)(const void *addr, socklen_t len, int type, struct hostent *ret, char *buf, size_t buflen,
-                                   struct hostent **result, int *h_errnop);
-
-typedef struct hostent *(*gethostbyaddr_f_t)(const void *addr, socklen_t len, int type);
-
-typedef int (*getaddrinfo_f_t)(const char *name, const char *service, const struct addrinfo *req, struct addrinfo **pai);
-typedef int (*getsockopt_f_t)(int fd, int level, int optname, void *optval, socklen_t *optlen);
-typedef int (*close_f_t)(int fd);
-
-typedef int (*accept_f_t)(int, const struct sockaddr*, socklen_t *);
-typedef int (*accept4_f_t)(int, const struct sockaddr*, socklen_t *, int);
-
+#include <netdb.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define LIB_FUNCS(XX)   \
     XX(socket)          \
@@ -61,7 +37,7 @@ typedef int (*accept4_f_t)(int, const struct sockaddr*, socklen_t *, int);
     XX(close)
 
 struct stdlib_funcs_s {
-#define decl_stdlib_f(f) f##_f_t f##_f;
+#define decl_stdlib_f(f) typeof(f) *f##_f;
     LIB_FUNCS(decl_stdlib_f)
 };
 

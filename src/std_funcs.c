@@ -21,7 +21,7 @@ static uv_once_t init;
 static struct stdlib_funcs_s stdlib;
 
 static void do_init() {
-#define LOAD_FUNCS(f) stdlib.f##_f = (f##_f_t) dlsym(RTLD_NEXT, #f);
+#define LOAD_FUNCS(f) stdlib.f##_f = (typeof(f)*) dlsym(RTLD_NEXT, #f);
     LIB_FUNCS(LOAD_FUNCS)
 }
 
