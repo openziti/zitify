@@ -20,8 +20,25 @@ zitify enroll -j my_id.jwt -i my_id.json
 Zitify `curl`!
 
 ```console
-export ZITI_IDENTITIES=my_id.json
-zitify curl http://httpbin.ziti/json
+zitify -i my_id.json curl http://httpbin.ziti/json
+```
+
+## Hosting example
+Assume you have `host.json` ziti identity that has bind permission to `cool-service`. 
+You can bind your application to that service
+like this:
+```console
+zitify -i host.json -b 5555:cool-service ncat -l 5555
+```
+
+`-b` option configured a binding override, in the above example application trying to bind to port 5555 
+will actually bind to `cool-service` on the OpenZiti network.
+
+If that service has an intercept address (like `tcp:cool.service.ziti:1111`), 
+then you can connect to it with `zitify`-ed client and an identity(`client.json`) allowed to _dial_ your service.
+
+```console
+zitify -i client.json ncat cool.service.ziti 1111
 ```
 
 ## How it Works

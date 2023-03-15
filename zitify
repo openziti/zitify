@@ -20,8 +20,10 @@ preload_dir=$(dirname ${BASH_SOURCE[0]})
 preload_lib=${preload_dir}/libzitify.so
 
 usage() {
-    echo "zitify <cmd> [args]"
+    echo "zitify [-i <identity file>] [-b <port>:[<terminator>@]<service>] <cmd> [args]"
     echo "       Run zitified <cmd>"
+    echo "       -i <identity>                     Use identity file (can be specified with ZITI_IDENTITY environment var"
+    echo "       -b <port>:[<terminator>@]service  zitify binding to given <port> as binding to given service with optional terminator"
     echo ""
     echo "zitify enroll -j <enrollment token> -i <identity file> [ -k|--key <private key> [ -c|--cert certificate ] ]"
     echo "       Enroll identity"
@@ -69,6 +71,23 @@ with open(args.jwt, 'r') as jwt:
 EOF
 }
 
+while getopts "i:b:" o; do
+    case "${o}" in
+        i)
+          export ZITI_IDENTITIES=${OPTARG}
+          ;;
+        b)
+          echo "b = $OPTARG"
+          bindings=${bindings}${bindings+;}${OPTARG}
+          ;;
+        ?) usage
+          exit
+          ;;
+    esac
+done
+shift $((OPTIND-1))
+echo bindings = "${ZITI_BINDINGS}"
+
 if [ -z "$1" ]; then
 usage
 exit
@@ -79,5 +98,4 @@ if [ "$1" == "enroll" ]; then
   exit
 fi
 
-
-LD_PRELOAD=$preload_lib "$@"
+LD_PRELOAD="$preload_lib" ZITI_BINDINGS="${bindings}" "$@"
