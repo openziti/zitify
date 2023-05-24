@@ -1,0 +1,97 @@
+{
+  "version": 2,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 14,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev-mode",
+      "hidden": true,
+      "cacheVariables": {
+        "zitify_DEVELOPER_MODE": "ON"
+      }
+    },
+    {
+      "name": "vcpkg",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      }
+    },
+    {
+      "name": "ninja",
+      "hidden": true,
+      "generator": "Ninja"
+    },
+    {
+      "name": "ninja-multi-config",
+      "hidden": true,
+      "generator": "Ninja Multi-Config"
+    },
+    {
+      "name": "ci-std",
+      "description": "This preset makes sure the project actually builds with at least the specified standard",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_EXTENSIONS": "ON",
+        "CMAKE_C_STANDARD": "99",
+        "CMAKE_C_STANDARD_REQUIRED": "ON",
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_CXX_STANDARD": "11",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON"
+      }
+    },
+    {
+      "name": "flags-unix",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_FLAGS": "",
+        "CMAKE_CXX_FLAGS": ""
+      }
+    },
+    {
+      "name": "ci-unix",
+      "hidden": true,
+      "inherits": [
+        "flags-unix",
+        "ci-std",
+        "ninja-multi-config"
+      ],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "ci-build",
+      "binaryDir": "${sourceDir}/build",
+      "hidden": true
+    },
+    {
+      "name": "ci-linux-x64",
+      "inherits": [
+        "ci-build",
+        "ci-unix",
+        "vcpkg",
+        "dev-mode"
+      ]
+    },
+    {
+      "name": "ci-linux-arm64",
+      "inherits": "ci-linux-x64",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "arm64-linux",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/Linux-arm64.cmake"
+      }
+    },
+    {
+      "name": "ci-linux-arm",
+      "inherits": "ci-linux-x64",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "arm-linux",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/toolchains/Linux-arm.cmake"
+      }
+    }
+  ]
+}
