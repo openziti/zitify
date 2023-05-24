@@ -11,7 +11,7 @@ jobs:
     name: build ${{ matrix.spec.target }}
     runs-on: ${{ matrix.spec.runner }}
     container:
-      image: ${{ matrix.spec.builder
+      image: ${{ matrix.spec.builder }}
     strategy:
       fail-fast: false
       matrix:

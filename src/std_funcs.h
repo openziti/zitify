@@ -37,7 +37,7 @@
     XX(close)
 
 struct stdlib_funcs_s {
-#define decl_stdlib_f(f) typeof(f) *f##_f;
+#define decl_stdlib_f(f) __typeof__(f) *f##_f;
     LIB_FUNCS(decl_stdlib_f)
 };
 
