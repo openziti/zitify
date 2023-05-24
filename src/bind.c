@@ -151,7 +151,7 @@ void configure_bindings() {
         } else {
             b->service = strdup(col + 1);
         }
-        ZITI_LOG(ERROR, "added binding port[%ld] => %s@%s", port, b->terminator, b->service);
+        ZITI_LOG(INFO, "added binding port[%ld] => %s@%s", port, b->terminator, b->service);
         model_map_setl(&bindings, port, b);
     }
 }
