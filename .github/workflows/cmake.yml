@@ -8,13 +8,15 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.spec.name }}
+    name: build ${{ matrix.spec.target }}
     runs-on: ${{ matrix.spec.runner }}
+    container:
+      image: ${{ matrix.spec.builder
     strategy:
       fail-fast: false
       matrix:
         spec:
-        - { name: 'Linux x86_64', runner: 'ubuntu-20.04' }
+        - { target: 'linux-x64', runner: 'ubuntu-latest', builder: 'openziti/ziti-cmake' }
 
     steps:
       - uses: lukka/get-cmake@latest
