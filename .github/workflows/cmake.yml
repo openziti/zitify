@@ -1,8 +1,7 @@
 name: C/C++ CI
 
 on:
-  push:
-    branches: [ '**' ]
+  workflow_dispatch:
   pull_request:
     branches: [ main ]
 
@@ -16,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         spec:
-        - { target: 'linux-x64', runner: 'ubuntu-latest', builder: 'openziti/ziti-cmake' }
+        - { target: 'linux-x64', runner: 'ubuntu-latest', builder: 'openziti/ziti-builder' }
 
     steps:
       - uses: lukka/get-cmake@latest
