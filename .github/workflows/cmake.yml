@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         spec:
-        - { target: 'linux-x64', runner: 'ubuntu-latest', builder: 'openziti/ziti-builder' }
+        - { target: 'linux-x64', runner: 'ubuntu-latest', builder: 'openziti/ziti-builder:1.0.3' }
 
     steps:
       - uses: lukka/get-cmake@latest
