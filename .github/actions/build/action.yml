@@ -26,7 +26,7 @@ runs:
 
     - uses: lukka/get-cmake@latest
 
-    - uses: lukka/run-vcpkg@v10
+    - uses: lukka/run-vcpkg@v11
 
     - uses: lukka/run-cmake@v10
       name: Configure CMake
