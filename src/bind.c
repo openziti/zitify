@@ -56,7 +56,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *socklen) {
     }
 
     if (socklen && addr) {
-        struct sockaddr_un *zaddr = addr;
+        struct sockaddr_un *zaddr = (struct sockaddr_un *) addr;
         addr->sa_family = AF_UNIX;
         snprintf(zaddr->sun_path, sizeof(zaddr->sun_path), "ziti:%s", caller);
         *socklen = sizeof(struct sockaddr_un);
@@ -74,7 +74,7 @@ int accept4(int fd, struct sockaddr *addr, socklen_t *socklen, int flags) {
     }
 
     if (socklen && addr) {
-        struct sockaddr_un *zaddr = addr;
+        struct sockaddr_un *zaddr = (struct sockaddr_un *) addr;
         addr->sa_family = AF_UNIX;
         snprintf(zaddr->sun_path, sizeof(zaddr->sun_path), "ziti:%s", caller);
         *socklen = sizeof(struct sockaddr_un);
@@ -90,32 +90,37 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len) {
     uint16_t port16;
     switch (addr->sa_family) {
         case AF_INET:
-            port16 = ((const struct sockaddr_in*)addr)->sin_port;
+            port16 = ((const struct sockaddr_in *) addr)->sin_port;
             break;
         case AF_INET6:
-            port16 = ((const struct sockaddr_in6*)addr)->sin6_port;
+            port16 = ((const struct sockaddr_in6 *) addr)->sin6_port;
             break;
         default:
-            return EINVAL;
+            goto fallback;
     }
     long port = ntohs(port16);
     ZITI_LOG(DEBUG, "looking up binding for port[%ld]", port);
 
     struct binding_s *b = model_map_getl(&bindings, port);
-    if (b != NULL) {
-        ZITI_LOG(DEBUG, "found binding[%s@%s] for port[%ld]", b->terminator, b->service, port);
-        ziti_context ztx = get_ziti_context();
-        int rc = Ziti_bind(fd, ztx, b->service, b->terminator);
-        if (rc != 0) {
-            ZITI_LOG(WARN, "bind error(): %d/%s", Ziti_last_error(), ziti_errorstr(Ziti_last_error()));
-            if (Ziti_last_error() == EALREADY) {
-                return 0;
-            }
-        }
-        return rc;
-    } else {
-        return stdlib_funcs()->bind_f(fd, addr, len);
+    if (b == NULL) {
+        goto fallback;
     }
+
+    ZITI_LOG(DEBUG, "found binding[%s@%s] for port[%ld]", b->terminator, b->service, port);
+    ziti_context ztx = get_ziti_context();
+    int rc = Ziti_bind(fd, ztx, b->service, b->terminator);
+    if (rc != 0) {
+        ZITI_LOG(WARN, "bind error(): %d/%s", Ziti_last_error(), ziti_errorstr(Ziti_last_error()));
+        if (Ziti_last_error() == EALREADY) {
+            return 0;
+        }
+    }
+    return rc;
+
+    fallback:
+        ZITI_LOG(DEBUG, "no binding found, falling back to stdlib");
+        return stdlib_funcs()->bind_f(fd, addr, len);
+
 }
 
 void configure_bindings() {
