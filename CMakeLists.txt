@@ -12,7 +12,7 @@ project(zitify
         )
 
 message("zitify version: ${PROJECT_VERSION}")
-include(deps.cmake)
+include(cmake/deps.cmake)
 
 include(CTest)
 enable_testing()

@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: lukka/get-cmake@latest
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -32,7 +32,7 @@ jobs:
           test_id: ${{ secrets.ZITI_TEST_IDENTITY }}
 
       - name: upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: zitify-pack-${{ matrix.spec.toolchain || runner.os }}
           path: ${{ runner.workspace }}/build/package/zitify-*
