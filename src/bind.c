@@ -45,7 +45,7 @@ int listen(int fd, int backlog) {
     return rc;
 }
 
-int accept(int fd, struct sockaddr *addr, socklen_t *socklen) {
+int accept(int fd, __SOCKADDR_ARG addr, socklen_t *socklen) {
     ZITI_LOG(DEBUG, "in accept(%d,...)", fd);
 
     char caller[128] = "";
@@ -55,9 +55,9 @@ int accept(int fd, struct sockaddr *addr, socklen_t *socklen) {
         return stdlib_funcs()->accept_f(fd, addr, socklen);
     }
 
-    if (socklen && addr) {
-        struct sockaddr_un *zaddr = addr;
-        addr->sa_family = AF_UNIX;
+    if (socklen && addr.__sockaddr_un__) {
+        struct sockaddr_un *zaddr = addr.__sockaddr_un__;
+        zaddr->sun_family = AF_UNIX;
         snprintf(zaddr->sun_path, sizeof(zaddr->sun_path), "ziti:%s", caller);
         *socklen = sizeof(struct sockaddr_un);
     }
@@ -65,7 +65,7 @@ int accept(int fd, struct sockaddr *addr, socklen_t *socklen) {
     return clt;
 }
 
-int accept4(int fd, struct sockaddr *addr, socklen_t *socklen, int flags) {
+int accept4(int fd, __SOCKADDR_ARG addr, unsigned int *socklen, int flags) {
     ZITI_LOG(DEBUG, "in accept4(%d,...)", fd);
     char caller[128];
     ziti_socket_t clt = Ziti_accept(fd, caller, sizeof(caller));
@@ -73,9 +73,9 @@ int accept4(int fd, struct sockaddr *addr, socklen_t *socklen, int flags) {
         return stdlib_funcs()->accept4_f(fd, addr, socklen, flags);
     }
 
-    if (socklen && addr) {
-        struct sockaddr_un *zaddr = addr;
-        addr->sa_family = AF_UNIX;
+    if (socklen && addr.__sockaddr_un__) {
+        struct sockaddr_un *zaddr = addr.__sockaddr_un__;
+        zaddr->sun_family = AF_UNIX;
         snprintf(zaddr->sun_path, sizeof(zaddr->sun_path), "ziti:%s", caller);
         *socklen = sizeof(struct sockaddr_un);
     }
@@ -84,19 +84,19 @@ int accept4(int fd, struct sockaddr *addr, socklen_t *socklen, int flags) {
 }
 
 
-int bind(int fd, const struct sockaddr *addr, socklen_t len) {
+int bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t len) {
     ZITI_LOG(DEBUG, "in bind(%d,...)", fd);
 
     uint16_t port16;
-    switch (addr->sa_family) {
+    switch (addr.__sockaddr__->sa_family) {
         case AF_INET:
-            port16 = ((const struct sockaddr_in*)addr)->sin_port;
+            port16 = addr.__sockaddr_in__->sin_port;
             break;
         case AF_INET6:
-            port16 = ((const struct sockaddr_in6*)addr)->sin6_port;
+            port16 = addr.__sockaddr_in6__->sin6_port;
             break;
         default:
-            return EINVAL;
+            return stdlib_funcs()->bind_f(fd, addr, len);;
     }
     long port = ntohs(port16);
     ZITI_LOG(DEBUG, "looking up binding for port[%ld]", port);
@@ -104,7 +104,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len) {
     struct binding_s *b = model_map_getl(&bindings, port);
     if (b != NULL) {
         ZITI_LOG(DEBUG, "found binding[%s@%s] for port[%ld]", b->terminator, b->service, port);
-        ziti_context ztx = get_ziti_context();
+        ziti_handle_t ztx = get_ziti_context();
         int rc = Ziti_bind(fd, ztx, b->service, b->terminator);
         if (rc != 0) {
             ZITI_LOG(WARN, "bind error(): %d/%s", Ziti_last_error(), ziti_errorstr(Ziti_last_error()));
@@ -113,9 +113,9 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len) {
             }
         }
         return rc;
-    } else {
-        return stdlib_funcs()->bind_f(fd, addr, len);
     }
+
+    return stdlib_funcs()->bind_f(fd, addr, len);
 }
 
 void configure_bindings() {
