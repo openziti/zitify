@@ -18,6 +18,7 @@
 #define ZITIFY_ZITIFY_H
 
 #include <ziti/zitilib.h>
+#include <uv.h>
 
 #ifdef __cplusplus
 extern "C" {
