@@ -67,7 +67,7 @@ You can build zitify locally using the provided build script, which uses the off
    ```
 
    The script will:
-   - Clean any existing build directory
+   - Clean any existing build directory (only when `--clean` flag is used)
    - Run the build inside the `openziti/ziti-builder:v3` container
    - Use vcpkg to fetch and compile all dependencies
    - Build zitify and create distribution packages
