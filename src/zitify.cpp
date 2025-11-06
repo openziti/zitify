@@ -27,7 +27,7 @@
 static const struct stdlib_funcs_s& stdlib = *stdlib_funcs();
 
 static uv_once_t load_once;
-static ziti_context ziti_instance;
+static ziti_handle_t ziti_instance;
 static void load_identities() {
     Ziti_lib_init();
 
@@ -38,7 +38,7 @@ static void load_identities() {
     size_t pos;
     pos = ids.find(';');
     auto id = ids.substr(0, pos);
-    ziti_instance = Ziti_load_context(id.c_str());
+    ziti_instance = Ziti_load_context(&ziti_instance, id.c_str());
     ids.erase(0, pos + 1);
 }
 
@@ -69,7 +69,7 @@ public:
 
 static Zitifier loader;
 
-ziti_context get_ziti_context() {
+ziti_handle_t get_ziti_context() {
     return ziti_instance;
 }
 
