@@ -22,7 +22,7 @@ preload_lib=${preload_dir}/libzitify.so
 usage() {
     echo "zitify [-i <identity file>] [-b <port>:[<terminator>@]<service>] <cmd> [args]"
     echo "       Run zitified <cmd>"
-    echo "       -i <identity>                     Use identity file (can be specified with ZITI_IDENTITY environment var"
+    echo "       -i <identity>                     Use identity file (can be specified with ZITI_IDENTITIES environment var"
     echo "       -b <port>:[<terminator>@]service  zitify binding to given <port> as binding to given service with optional terminator"
     echo ""
     echo "zitify enroll -j <enrollment token> -i <identity file> [ -k|--key <private key> [ -c|--cert certificate ] ]"
