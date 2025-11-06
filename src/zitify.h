@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-ziti_context get_ziti_context();
+ziti_handle_t* get_ziti_context();
 
 void configure_bindings();
 
