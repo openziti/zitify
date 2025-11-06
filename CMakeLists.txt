@@ -20,7 +20,13 @@ enable_testing()
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 
     add_library(zitify SHARED
-            src/zitify.cpp src/std_funcs.h src/std_funcs.c src/bind.c src/zitify.h)
+            src/zitify.cpp
+            src/std_funcs.c
+            src/bind.c
+            src/connect.c
+            src/resolve.c
+            src/sockets.c
+    )
     target_compile_options(zitify PRIVATE -D_GNU_SOURCE -DZITI_LOG_MODULE="zitify")
 
     set_target_properties(zitify PROPERTIES

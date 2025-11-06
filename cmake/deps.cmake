@@ -4,7 +4,7 @@ include(FetchContent)
 set(ZITI_BUILD_PROGRAMS off)
 set(ZITI_BUILD_TESTS off)
 
-set(ZITI_SDK_VERSION "1.9.5" CACHE STRING "Version of Ziti SDK to use")
+set(ZITI_SDK_VERSION "1.9.15" CACHE STRING "Version of Ziti SDK to use")
 
 if (ZITI_SDK_DIR)
         add_subdirectory(${ZITI_SDK_DIR} ${CMAKE_CURRENT_BINARY_DIR}/ziti-sdk)
