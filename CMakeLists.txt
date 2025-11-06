@@ -27,7 +27,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
                       VERSION ${PROJECT_VERSION}
                       SOVERSION ${PROJECT_VERSION_MAJOR})
 
-    target_link_libraries(zitify PRIVATE ziti)
+    target_link_libraries(zitify PRIVATE ziti c-ares::cares)
 
     set(zitify_archive zitify-${CMAKE_PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}.tar.gz)
 
