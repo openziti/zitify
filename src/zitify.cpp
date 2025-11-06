@@ -139,7 +139,7 @@ int getnameinfo(const struct sockaddr *addr, socklen_t salen,
 
     const char* hostname;
     if (in_addr == 0 || (hostname = Ziti_lookup(in_addr)) == nullptr) {
-        ZITI_LOG(DEBUG,"fallback getnameinfo", hostname);
+        ZITI_LOG(DEBUG,"fallback getnameinfo");
         return stdlib.getnameinfo_f(addr, salen, host, hostlen, serv, servlen, flags);
     }
 

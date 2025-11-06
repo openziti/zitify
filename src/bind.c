@@ -105,7 +105,7 @@ int bind(int fd, const struct sockaddr *addr, socklen_t len) {
     if (b != NULL) {
         ZITI_LOG(DEBUG, "found binding[%s@%s] for port[%ld]", b->terminator, b->service, port);
         ziti_handle_t* ztx = get_ziti_context();
-        int rc = Ziti_bind(fd, ztx, b->service, b->terminator);
+        int rc = Ziti_bind(fd, *ztx, b->service, b->terminator);
         if (rc != 0) {
             ZITI_LOG(WARN, "bind error(): %d/%s", Ziti_last_error(), ziti_errorstr(Ziti_last_error()));
             if (Ziti_last_error() == EALREADY) {
