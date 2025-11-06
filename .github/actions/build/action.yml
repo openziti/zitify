@@ -26,6 +26,22 @@ runs:
 
     - uses: lukka/get-cmake@latest
 
+    - name: setup build cache
+      shell: bash
+      run: |
+        CI_CACHE="${GITHUB_WORKSPACE}/.ci.cache"
+        VCPKG_BINARY_SOURCES="clear;files,${GITHUB_WORKSPACE}/.ci.cache,readwrite"
+        mkdir -p ${CI_CACHE}
+        echo "CI_CACHE=${CI_CACHE}" >> $GITHUB_ENV
+        echo "VCPKG_BINARY_SOURCES=${VCPKG_BINARY_SOURCES}" >> $GITHUB_ENV
+
+    - uses: actions/cache/restore@v4
+      id: restore
+      with:
+        key: vbc-${{ inputs.target }}-${{ hashFiles('./vcpkg.json') }}
+        restore-keys: vbc-${{ inputs.target }}-
+        path: ${{ env.CI_CACHE }}
+
     - uses: lukka/run-vcpkg@v11
 
     - uses: lukka/run-cmake@v10
@@ -33,6 +49,11 @@ runs:
       with:
         configurePreset: ci-${{ inputs.target }}
         configurePresetAdditionalArgs: "[ `-B`, `./build` ]"
+
+    - uses: actions/cache/save@v4
+      with:
+        key: ${{ steps.restore.outputs.cache-primary-key }}
+        path: ${{ env.CI_CACHE }}
 
     - name: build CMake
       run: cmake --build ./build --config ${{ inputs.config }}
