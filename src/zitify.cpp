@@ -29,17 +29,6 @@
 #include "std_funcs.h"
 #include "zitify.h"
 
-// ============================================================================
-// Forward Declarations for Dynamic Fake IP to Service Mapping
-// ============================================================================
-// These functions map fake IP addresses to their corresponding Ziti service names,
-// allowing the connect() function to properly route connections back to Ziti.
-
-#include <unordered_map>
-static uint32_t get_fake_ip_for_service(const char* service_name);
-static const char* get_service_for_fake_ip(uint32_t fake_ip);
-
-
 static const struct stdlib_funcs_s& stdlib = *stdlib_funcs();
 
 static uv_once_t load_once;
@@ -187,15 +176,12 @@ int connect(int fd, const struct sockaddr *addr, socklen_t size) {
 
     const char* hostname;
     
-    // Check if this is a fake IP from our C-ares hooks
-    const char* mapped_service = get_service_for_fake_ip(in_addr);
-    if (mapped_service != nullptr) {
-        ZITI_LOG(DEBUG, "Detected fake Ziti IP: %s, attempting Ziti connection to service: %s", addrbuf, mapped_service);
-        hostname = mapped_service;
-    } else if (in_addr == 0 || (hostname = Ziti_lookup(in_addr)) == nullptr) {
+    // Use Ziti_lookup to find if this IP maps to a Ziti service (SDK's CG-NAT range)
+    if (in_addr == 0 || (hostname = Ziti_lookup(in_addr)) == nullptr) {
         ZITI_LOG(DEBUG,"fallback connect: %s", addrbuf);
         return stdlib.connect_f(fd, addr, size);
     }
+    
     port = ntohs(port);
 
     ZITI_LOG(DEBUG,"connecting fd=%d addr=%s(%s):%d", fd, addrbuf, hostname, port);
@@ -217,82 +203,9 @@ int setsockopt(int fd, int level, int optname,
 }
 
 // ============================================================================
-// Dynamic Fake IP to Service Mapping
-// ============================================================================
-// This system maps fake IP addresses to their corresponding Ziti service names,
-// allowing the connect() function to properly route connections back to Ziti.
-
-#include <unordered_map>
-static std::unordered_map<uint32_t, std::string> fake_ip_to_service_map;
-static uint32_t next_fake_ip = htonl(0x7ffe0101); // Start with 127.254.1.1
-
-// Helper function to get or allocate a fake IP for a Ziti service
-static uint32_t get_fake_ip_for_service(const char* service_name) {
-    if (!service_name) return htonl(0x7ffe0101); // Default fallback
-    
-    std::string service(service_name);
-    
-    // Check if we already have a mapping for this service
-    for (const auto& pair : fake_ip_to_service_map) {
-        if (pair.second == service) {
-            return pair.first;
-        }
-    }
-    
-    // Allocate a new fake IP
-    uint32_t fake_ip = next_fake_ip++;
-    fake_ip_to_service_map[fake_ip] = service;
-    
-    char ip_str[INET_ADDRSTRLEN];
-    uv_inet_ntop(AF_INET, &fake_ip, ip_str, sizeof(ip_str));
-    ZITI_LOG(DEBUG, "Allocated fake IP %s for service %s", ip_str, service_name);
-    
-    return fake_ip;
-}
-
-// Helper function to check if an IP is in our fake IP range
-static bool is_fake_ip_range(uint32_t ip) {
-    // Convert to host byte order for comparison
-    uint32_t ip_host = ntohl(ip);
-    uint32_t fake_ip_start = 0x7ffe0101; // 127.254.1.1 in host byte order
-    uint32_t fake_ip_end = 0x7fefffff;   // 127.254.255.255 in host byte order
-    
-    return (ip_host >= fake_ip_start && ip_host <= fake_ip_end);
-}
-
-// Helper function to find the service name for a fake IP
-static const char* get_service_for_fake_ip(uint32_t fake_ip) {
-    auto it = fake_ip_to_service_map.find(fake_ip);
-    if (it != fake_ip_to_service_map.end()) {
-        return it->second.c_str();
-    }
-    
-    // If not found in mapping but it's in our fake IP range,
-    // it might be a direct IP connection. Try to find a default service.
-    if (is_fake_ip_range(fake_ip)) {
-        struct in_addr addr;
-        addr.s_addr = fake_ip;
-        ZITI_LOG(DEBUG, "IP %s is in fake IP range but not mapped, checking for default Ziti service", 
-                 inet_ntoa(addr));
-        
-        // For now, return the first mapped service as a fallback
-        // In a production environment, this could be more sophisticated
-        if (!fake_ip_to_service_map.empty()) {
-            const char* default_service = fake_ip_to_service_map.begin()->second.c_str();
-            ZITI_LOG(DEBUG, "Using default service %s for unmapped fake IP", default_service);
-            return default_service;
-        }
-    }
-    
-    return nullptr;
-}
-
-// ============================================================================
-// C-ares DNS Resolution Hooks
-// ============================================================================
-// These hooks intercept gRPC's C-ares DNS resolution calls to provide
-// fake IP addresses for Ziti domains, which will then be intercepted
-// by the existing connect() hook.
+// These hooks intercept C-ares DNS resolution calls to provide
+// intercepted IP addresses for Ziti domains, which will then be recognized
+// by the connect() hook.
 
 extern "C" {
     // Original C-ares function pointers
@@ -315,131 +228,148 @@ extern "C" {
                  original_ares_query, original_ares_gethostbyname);
     }
     
-    // Helper function to check if hostname is a Ziti intercept domain using Ziti_resolve
-    static bool is_ziti_intercept_domain(const char* name, char** service_name) {
-        if (!name) return false;
-        
-        // Use Ziti_resolve to check if this is a Ziti intercept domain
-        struct addrinfo* result = nullptr;
-        struct addrinfo hints = {};
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-        
-        // Convert port to string for Ziti_resolve
-        char port_str[16];
-        snprintf(port_str, sizeof(port_str), "%d", 10001); // Default port, could be made configurable
-        
-        int rc = Ziti_resolve(name, port_str, &hints, &result);
-        if (rc == 0 && result != nullptr) {
-            ZITI_LOG(DEBUG, "Ziti_resolve found intercept domain: %s", name);
-            
-            // Extract the service name from the result for connect() mapping
-            if (service_name != nullptr && result->ai_canonname != nullptr) {
-                *service_name = strdup(result->ai_canonname);
-                ZITI_LOG(DEBUG, "Mapped domain %s to service %s", name, *service_name);
-            }
-            
-            // Clean up
-            freeaddrinfo(result);
-            return true;
-        }
-        
-        return false;
-    }
-    
     // Helper function to create a fake DNS response for Ziti domains
-    static void create_fake_dns_response(const char* name, ares_callback callback, void *arg) {
-        ZITI_LOG(DEBUG, "Creating fake DNS response for Ziti domain: %s", name);
+    static void create_ziti_dns_response(const char* name, const char* port, ares_channel_t *channel, int dnsclass, int type, ares_callback callback, void *arg) {
+        ZITI_LOG(DEBUG, "Creating Ziti DNS response for domain: %s:%s", name, port);
         
-        // Get the service name for this domain
-        char* service_name = nullptr;
-        if (!is_ziti_intercept_domain(name, &service_name) || !service_name) {
-            // Fallback to default if service lookup fails
-            service_name = strdup(name);
+        // Use Ziti_resolve to get the SDK's fake IP
+        struct addrinfo *result = nullptr;
+        int rc = Ziti_resolve(name, port, nullptr, &result);
+        
+        if (rc != 0 || result == nullptr) {
+            ZITI_LOG(DEBUG, "Ziti_resolve failed for %s:%s, falling back", name, port);
+            // Fall back to original C-ares query
+            if (original_ares_query) {
+                original_ares_query(channel, name, dnsclass, type, callback, arg);
+            }
+            return;
         }
         
-        // Get a dynamic fake IP for this service
-        uint32_t fake_ip = get_fake_ip_for_service(service_name);
-        free(service_name);
+        // Extract the fake IP from Ziti_resolve's response
+        if (result->ai_addr && result->ai_family == AF_INET) {
+            auto addr4 = (sockaddr_in *) result->ai_addr;
+            uint32_t ziti_fake_ip = addr4->sin_addr.s_addr;
+            
+            char ip_str[INET_ADDRSTRLEN];
+            uv_inet_ntop(AF_INET, &ziti_fake_ip, ip_str, sizeof(ip_str));
+            ZITI_LOG(DEBUG, "Ziti_resolve assigned %s:%s => %s", name, port, ip_str);
+            
+            // Construct DNS response with the Ziti SDK's fake IP
+            unsigned char dns_response[512];
+            int response_len = 0;
+            
+            // Minimal DNS header
+            memset(dns_response, 0, sizeof(dns_response));
+            dns_response[0] = 0x12;  // Transaction ID
+            dns_response[1] = 0x34;
+            dns_response[2] = 0x81;  // Response, Authoritative, No Error
+            dns_response[3] = 0x80;
+            dns_response[4] = 0x00;  // Questions: 1
+            dns_response[5] = 0x01;
+            dns_response[6] = 0x00;  // Answers: 1  
+            dns_response[7] = 0x01;
+            response_len = 8;
+            
+            // Copy original question (simplified - in production would preserve original)
+            // For now, just add the answer section
+            dns_response[response_len++] = 0xc0;  // Pointer to question name
+            dns_response[response_len++] = 0x0c;
+            dns_response[response_len++] = 0x00;  // Type: A record
+            dns_response[response_len++] = 0x01;
+            dns_response[response_len++] = 0x00;  // Class: IN
+            dns_response[response_len++] = 0x01;
+            dns_response[response_len++] = 0x00;  // TTL (4 bytes)
+            dns_response[response_len++] = 0x00;
+            dns_response[response_len++] = 0x0e;
+            dns_response[response_len++] = 0x10;
+            dns_response[response_len++] = 0x00;  // Data length: 4
+            dns_response[response_len++] = 0x04;
+            
+            // Copy the fake IP address
+            memcpy(&dns_response[response_len], &ziti_fake_ip, 4);
+            response_len += 4;
+            
+            // Call the callback with our DNS response
+            callback(arg, ARES_SUCCESS, 0, dns_response, response_len);
+            
+        } else {
+            ZITI_LOG(DEBUG, "Ziti_resolve returned non-IPv4 address for %s:%s", name, port);
+            // Fall back to original C-ares
+            if (original_ares_query) {
+                original_ares_query(channel, name, dnsclass, type, callback, arg);
+            }
+        }
         
-        // For simplicity, we'll construct a basic DNS response
-        // In a production implementation, this would need to be more robust
-        unsigned char fake_response[512];
-        int response_len = 0;
-        
-        // Minimal DNS header (simplified)
-        memset(fake_response, 0, sizeof(fake_response));
-        // Transaction ID
-        fake_response[0] = 0x12;
-        fake_response[1] = 0x34;
-        // Flags: Response, No Error
-        fake_response[2] = 0x81;
-        fake_response[3] = 0x80;
-        // Questions: 1, Answers: 1
-        fake_response[4] = 0x00;
-        fake_response[5] = 0x01;
-        fake_response[6] = 0x00;
-        fake_response[7] = 0x01;
-        
-        // Query section (simplified - would need proper encoding)
-        response_len = 12;
-        
-        // Answer section with dynamic fake IP
-        fake_response[response_len++] = 0xc0; // Name pointer
-        fake_response[response_len++] = 0x0c; // to query name
-        fake_response[response_len++] = 0x00; // Type A
-        fake_response[response_len++] = 0x01;
-        fake_response[response_len++] = 0x00; // Class IN
-        fake_response[response_len++] = 0x01;
-        fake_response[response_len++] = 0x00; // TTL
-        fake_response[response_len++] = 0x00;
-        fake_response[response_len++] = 0x00;
-        fake_response[response_len++] = 0x3c;
-        fake_response[response_len++] = 0x00; // Data length
-        fake_response[response_len++] = 0x04;
-        // Add the dynamic fake IP
-        fake_response[response_len++] = (fake_ip >> 0) & 0xFF;
-        fake_response[response_len++] = (fake_ip >> 8) & 0xFF;
-        fake_response[response_len++] = (fake_ip >> 16) & 0xFF;
-        fake_response[response_len++] = (fake_ip >> 24) & 0xFF;
-        
-        callback(arg, ARES_SUCCESS, 0, fake_response, response_len);
+        // Clean up
+        if (result) {
+            freeaddrinfo(result);
+        }
     }
     
     // Helper function to create a fake hostent for Ziti domains
-    static void create_fake_hostent(const char* name, ares_host_callback callback, void *arg) {
-        ZITI_LOG(DEBUG, "Creating fake hostent for Ziti domain: %s", name);
+    static void create_ziti_hostent(const char* name, struct addrinfo *result, ares_host_callback callback, void *arg) {
+        ZITI_LOG(DEBUG, "Creating Ziti hostent for domain: %s", name);
         
-        // Get the service name for this domain
-        char* service_name = nullptr;
-        if (!is_ziti_intercept_domain(name, &service_name) || !service_name) {
-            // Fallback to default if service lookup fails
-            service_name = strdup(name);
+        // Use the provided result instead of calling Ziti_resolve again
+        if (!result) {
+            ZITI_LOG(DEBUG, "No result provided for %s, falling back", name);
+            // Fall back to original C-ares query
+            if (original_ares_gethostbyname) {
+                original_ares_gethostbyname(nullptr, name, AF_INET, callback, arg);
+            }
+            return;
         }
         
-        // Get a dynamic fake IP for this service
-        uint32_t fake_ip = get_fake_ip_for_service(service_name);
-        free(service_name);
+        // Extract the fake IP from the provided result
+        if (result->ai_addr && result->ai_family == AF_INET) {
+            auto addr4 = (sockaddr_in *) result->ai_addr;
+            uint32_t ziti_fake_ip = addr4->sin_addr.s_addr;
+            
+            char ip_str[INET_ADDRSTRLEN];
+            uv_inet_ntop(AF_INET, &ziti_fake_ip, ip_str, sizeof(ip_str));
+            ZITI_LOG(DEBUG, "Using cached Ziti_resolve result for %s => %s", name, ip_str);
+            
+            // Use static allocation to avoid memory management issues
+            static char h_name_buf[256];
+            static char* h_aliases_buf[2] = { nullptr };
+            static struct in_addr h_addr_list_buf[2];
+            static char* h_addr_ptrs[2];
+            
+            // Set up the hostent structure
+            strncpy(h_name_buf, name, sizeof(h_name_buf) - 1);
+            h_name_buf[sizeof(h_name_buf) - 1] = '\0';
+            
+            // Set up the fake IP address
+            h_addr_list_buf[0].s_addr = ziti_fake_ip;
+            h_addr_list_buf[1].s_addr = 0; // Null terminator
+            
+            // Set up address pointers
+            h_addr_ptrs[0] = (char*)&h_addr_list_buf[0];
+            h_addr_ptrs[1] = nullptr;
+            
+            // Create the hostent structure
+            struct hostent hent;
+            hent.h_name = h_name_buf;
+            hent.h_aliases = h_aliases_buf;
+            hent.h_addrtype = AF_INET;
+            hent.h_length = sizeof(struct in_addr);
+            hent.h_addr_list = h_addr_ptrs;
+            
+            // Call the callback with our fake hostent
+            callback(arg, ARES_SUCCESS, 0, &hent);
+            
+        } else {
+            ZITI_LOG(DEBUG, "No IPv4 address in result for %s, falling back", name);
+            // Fall back to original C-ares query
+            if (original_ares_gethostbyname) {
+                original_ares_gethostbyname(nullptr, name, AF_INET, callback, arg);
+            }
+        }
         
-        // Create a fake hostent structure
-        static char fake_name[256];
-        static char* fake_aliases[2] = { nullptr, nullptr };
-        static struct in_addr fake_addr;
-        static char* fake_addr_list[2] = { (char*)&fake_addr, nullptr };
-        static struct hostent fake_host;
-        
-        strncpy(fake_name, name, sizeof(fake_name) - 1);
-        fake_name[sizeof(fake_name) - 1] = '\0';
-        
-        fake_addr.s_addr = fake_ip; // Use dynamic fake IP
-        
-        fake_host.h_name = fake_name;
-        fake_host.h_aliases = fake_aliases;
-        fake_host.h_addrtype = AF_INET;
-        fake_host.h_length = sizeof(struct in_addr);
-        fake_host.h_addr_list = fake_addr_list;
-        
-        callback(arg, ARES_SUCCESS, 0, &fake_host);
+        // Clean up
+        if (result) {
+            freeaddrinfo(result);
+        }
     }
     
     // Hooked ares_query function
@@ -448,17 +378,16 @@ extern "C" {
         
         ZITI_LOG(DEBUG, "Hooked ares_query for %s (type=%d)", name, type);
         
-        // Check if this is a Ziti intercept domain we should handle
-        if (is_ziti_intercept_domain(name, nullptr)) {
-            ZITI_LOG(DEBUG, "Intercepting Ziti domain query: %s", name);
-            
-            if (type == ns_t_a || type == ns_t_aaaa) {
-                // Provide fake DNS response for A/AAAA queries
-                create_fake_dns_response(name, callback, arg);
-                return;
-            }
+        // Always attempt Ziti resolution - let Ziti_resolve determine if it's a Ziti domain
+        ZITI_LOG(DEBUG, "Intercepting domain query: %s", name);
+        
+        if (type == ns_t_a || type == ns_t_aaaa) {
+            // Use Ziti_resolve to get the SDK's fake IP and create DNS response
+            create_ziti_dns_response(name, "10001", channel, dnsclass, type, callback, arg);
+            return;
         }
         
+        // Fall back to original C-ares query for non-Ziti domains or other record types
         if (original_ares_query) {
             original_ares_query(channel, name, dnsclass, type, callback, arg);
         }
@@ -471,20 +400,59 @@ extern "C" {
         ZITI_LOG(DEBUG, "Hooked ares_gethostbyname for %s (family=%d, AF_INET=%d, AF_INET6=%d, AF_UNSPEC=%d)", 
                  name, family, AF_INET, AF_INET6, AF_UNSPEC);
         
-        // Check if this is a Ziti intercept domain we should handle
-        bool is_ziti = is_ziti_intercept_domain(name, nullptr);
+        // Always attempt Ziti resolution - let Ziti_resolve determine if it's a Ziti domain
         bool valid_family = (family == AF_INET || family == AF_INET6 || family == AF_UNSPEC);
-        ZITI_LOG(DEBUG, "Domain check: is_ziti=%s, valid_family=%s", 
-                 is_ziti ? "true" : "false", valid_family ? "true" : "false");
+        ZITI_LOG(DEBUG, "Domain check: valid_family=%s", valid_family ? "true" : "false");
         
-        if (is_ziti && valid_family) {
-            ZITI_LOG(DEBUG, "Intercepting Ziti host lookup: %s", name);
+        if (valid_family) {
+            ZITI_LOG(DEBUG, "Intercepting host lookup: %s", name);
             
-            // Provide fake hostent
-            create_fake_hostent(name, callback, arg);
-            return;
+            // Use Ziti_resolve to get the SDK's fake IP and create hostent response
+            struct addrinfo hints = {};
+            hints.ai_family = family;
+            hints.ai_socktype = SOCK_STREAM;
+            
+            struct addrinfo *result = nullptr;
+            int rc = Ziti_resolve(name, "10001", &hints, &result);
+            
+            if (rc == 0 && result != nullptr) {
+                // Create a simple hostent structure from the addrinfo result
+                static char h_name_buf[256];
+                static char* h_aliases_buf[1] = { nullptr };
+                static struct in_addr h_addr;
+                static char* h_addr_ptrs[2];
+                
+                strncpy(h_name_buf, name, sizeof(h_name_buf) - 1);
+                h_name_buf[sizeof(h_name_buf) - 1] = '\0';
+                
+                if (result->ai_addr && result->ai_family == AF_INET) {
+                    auto addr4 = (sockaddr_in *) result->ai_addr;
+                    h_addr = addr4->sin_addr;
+                    h_addr_ptrs[0] = (char*)&h_addr;
+                    h_addr_ptrs[1] = nullptr;
+                    
+                    struct hostent hent;
+                    hent.h_name = h_name_buf;
+                    hent.h_aliases = h_aliases_buf;
+                    hent.h_addrtype = AF_INET;
+                    hent.h_length = sizeof(struct in_addr);
+                    hent.h_addr_list = h_addr_ptrs;
+                    
+                    char ip_str[INET_ADDRSTRLEN];
+                    uv_inet_ntop(AF_INET, &h_addr, ip_str, sizeof(ip_str));
+                    ZITI_LOG(DEBUG, "ares_gethostbyname returning %s => %s", name, ip_str);
+                    
+                    callback(arg, ARES_SUCCESS, 0, &hent);
+                    freeaddrinfo(result);
+                    return;
+                }
+            }
+            
+            ZITI_LOG(DEBUG, "Ziti_resolve failed for %s, falling back", name);
+            freeaddrinfo(result);
         }
         
+        // Fall back to original C-ares function for non-Ziti domains or invalid families
         if (original_ares_gethostbyname) {
             original_ares_gethostbyname(channel, name, family, callback, arg);
         }
