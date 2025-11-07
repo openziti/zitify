@@ -20,8 +20,6 @@ jobs:
         - { target: 'linux-x64', runner: 'ubuntu-latest', builder: 'openziti/ziti-builder:v2' }
 
     steps:
-      - uses: lukka/get-cmake@latest
-
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
