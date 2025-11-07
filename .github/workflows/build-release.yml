@@ -17,7 +17,7 @@ jobs:
         - { name: 'Linux x86_64', runner: 'ubuntu-20.04' }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -29,7 +29,7 @@ jobs:
           test_id: ${{ secrets.ZITI_TEST_IDENTITY }}
 
       - name: upload SDK release bundle
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
