@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 
 jobs:
   build:
@@ -18,8 +20,6 @@ jobs:
         - { target: 'linux-x64', runner: 'ubuntu-latest', builder: 'openziti/ziti-builder:v2' }
 
     steps:
-      - uses: lukka/get-cmake@latest
-
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -31,8 +31,31 @@ jobs:
           test: ${{ matrix.spec.test }}
           test_id: ${{ secrets.ZITI_TEST_IDENTITY }}
 
+      - run: ls -lR ./build/package/
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: zitify-pack-${{ matrix.spec.toolchain || runner.os }}
-          path: ${{ runner.workspace }}/build/package/zitify-*
+          name: zitify-${{ matrix.spec.target || runner.os }}
+          path: ./build/package/zitify-*
+
+  nightly:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+        contents: write
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: ./artifacts
+          pattern: zitify-*
+          merge-multiple: 'false'
+
+      - run: ls -lR ./artifacts
+      - uses: pyTooling/Actions/releaser@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: nightly
+          rm: true
+          files: |
+            ./artifacts/*.gz

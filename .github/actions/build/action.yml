@@ -60,6 +60,6 @@ runs:
       shell: bash
 
     - name: bundle artifacts
-      run: cmake --build ./build --config ${{ inputs.config }} --target package
+      run: cmake --build ./build --config ${{ inputs.config }} --target zitify-pack
       shell: bash
 
