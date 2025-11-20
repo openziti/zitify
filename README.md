@@ -24,9 +24,11 @@ zitify -i my_id.json curl http://httpbin.ziti/json
 ```
 
 ## Hosting example
-Assume you have `host.json` ziti identity that has bind permission to `cool-service`. 
+
+Assume you have `host.json` ziti identity that has bind permission to `cool-service`.
 You can bind your application to that service
 like this:
+
 ```console
 zitify -i host.json -b 5555:cool-service ncat -l 5555
 ```
@@ -46,3 +48,7 @@ zitify -i client.json ncat cool.service.ziti 1111
 `zitify` is a shell script that employs the `LD_PRELOAD` trick (refer to [`man 8 ld.so`](https://man7.org/linux/man-pages/man8/ld.so.8.html)) to override a handful of networking-related functions from the GNU C standard library (`glibc`), e.g.,  `getaddrinfo()`, `getnameinfo()`, and `connect()` for dynamic executables.
 
 Statically-linked binaries, like Go programs, and programs that do not link to `libc.so` (check links with command `ldd EXECUTABLE`), will not work with this tool.
+
+## Building Locally
+
+See [BUILD.md](BUILD.md) for instructions on building zitify from source.
