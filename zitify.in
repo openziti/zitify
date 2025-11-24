@@ -22,7 +22,7 @@ preload_lib=${preload_dir}/libzitify.so
 usage() {
     echo "zitify [-i <identity file>] [-b <port>:[<terminator>@]<service>] <cmd> [args]"
     echo "       Run zitified <cmd>"
-    echo "       -i <identity>                     Use identity file (can be specified with ZITI_IDENTITIES environment var"
+    echo "       -i <identity>                     Use identity file (can be specified with ZITI_IDENTITY environment var"
     echo "       -b <port>:[<terminator>@]service  zitify binding to given <port> as binding to given service with optional terminator"
     echo ""
     echo "zitify enroll -j <enrollment token> -i <identity file> [ -k|--key <private key> [ -c|--cert certificate ] ]"
@@ -71,10 +71,19 @@ with open(args.jwt, 'r') as jwt:
 EOF
 }
 
+if [[ -n "${ZITI_IDENTITIES:-}" && -z "${ZITI_IDENTITY:-}" ]]; then
+  export ZITI_IDENTITY="${ZITI_IDENTITIES}"
+  echo "WARNING: ZITI_IDENTITIES is deprecated. Please use ZITI_IDENTITY." >&2
+fi
+
+if [[ "${ZITI_IDENTITY:-}" == *";"* ]]; then
+  echo "WARNING: ZITI_IDENTITY contains multiple identities. Only the first one will be used." >&2
+fi
+
 while getopts "i:b:" o; do
     case "${o}" in
         i)
-          export ZITI_IDENTITIES=${OPTARG}
+          export ZITI_IDENTITY=${OPTARG}
           ;;
         b)
           echo "b = $OPTARG"
@@ -87,7 +96,7 @@ while getopts "i:b:" o; do
 done
 shift $((OPTIND-1))
 if [[ -n "${ZITI_LOG:-}" && ${ZITI_LOG} =~ ^[0-9]+$ && ${ZITI_LOG} -ge 4 ]]; then  # if log level is at least 4
-  echo "DEBUG: ZITI_IDENTITIES='${ZITI_IDENTITIES}'" >&2  # avoid polluting wrapped command's stdout
+  echo "DEBUG: ZITI_IDENTITY='${ZITI_IDENTITY}'" >&2  # avoid polluting wrapped command's stdout
   if [[ -n "${bindings:-}" ]]; then
     echo "DEBUG: bindings='${bindings}'" >&2
   fi

@@ -15,7 +15,7 @@ class MyTestCase(unittest.TestCase):
             args=['curl', 'http://httpbin.ziti/json'],
             env={
                 'LD_PRELOAD': zitify_lib,
-                'ZITI_IDENTITIES': os.getenv('ZITI_TEST_IDENTITY'),
+                'ZITI_IDENTITY': os.getenv('ZITI_TEST_IDENTITY'),
                 'ZITI_LOG': '2'
             },
             stdout=subprocess.PIPE,
