@@ -28,7 +28,7 @@ static ziti_handle_t ziti_instance;
 static void load_identities() {
     Ziti_lib_init();
 
-    const char *env_str = getenv("ZITI_IDENTITIES");
+    const char *env_str = getenv("ZITI_IDENTITY");
     if (env_str == nullptr) { return; }
 
     std::string ids(env_str);
