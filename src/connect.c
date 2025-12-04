@@ -48,7 +48,18 @@ int connect(int fd, __CONST_SOCKADDR_ARG addr, socklen_t size) {
     }
 
     const char* hostname;
-    if (in_addr == 0 || (hostname = Ziti_lookup(in_addr)) == NULL) {
+    // First try Ziti_lookup (for libziti-allocated intercept IPs)
+    hostname = Ziti_lookup(in_addr);
+    
+    // If not found, try fake IP cache (for c-ares compatibility)
+    if (hostname == NULL && in_addr != 0) {
+        hostname = lookup_hostname_by_fake_ip(in_addr);
+        if (hostname != NULL) {
+            ZITI_LOG(INFO, "Resolved fake IP %s to hostname %s (from c-ares cache)", addrbuf, hostname);
+        }
+    }
+    
+    if (in_addr == 0 || hostname == NULL) {
         ZITI_LOG(DEBUG,"fallback connect: %s", addrbuf);
         return stdlib.connect_f(fd, addr, size);
     }
